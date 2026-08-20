@@ -78,6 +78,7 @@ jobs:
       - name: Test uninstall
         run: |
           if [[ "${{ matrix.os }}" == "macos-latest" ]]; then
+            export SHELL=/bin/zsh
             SHELL_RC="$HOME/.zshrc"
           else
             SHELL_RC="$HOME/.bashrc"
