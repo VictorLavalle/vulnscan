@@ -1,5 +1,9 @@
 # 🛡️ vulnscan
 
+[![CI](https://github.com/VictorLavalle/vulnscan/actions/workflows/ci.yml/badge.svg)](https://github.com/VictorLavalle/vulnscan/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![Version](https://img.shields.io/github/v/tag/VictorLavalle/vulnscan?label=version)](https://github.com/VictorLavalle/vulnscan/releases)
+
 Local dependency vulnerability scanning for **any project**. No API keys. No cloud credentials. Just results.
 
 Supports: **Java/Kotlin** (Maven, Gradle) · **Node.js** (npm, yarn, pnpm) · **Python** (pip, Pipenv, Poetry, uv) · **Go** · **.NET** (NuGet) · **Rust** (Cargo)
@@ -46,6 +50,7 @@ After installation, these commands are available in any Maven project:
 | `vulnscan-all` | Same but includes vulnerabilities without a known fix |
 | `vulnscan-summary` | Grouped table view with colors and GHSA references |
 | `vulnscan-json` | Export full results to `target/vuln-report.json` |
+| `vulnscan-update` | Update the vulnerability database |
 | `checkscan` | Scan IaC, Dockerfiles, secrets, GitHub Actions (failures only) |
 
 ## Usage
@@ -109,6 +114,16 @@ When `vulnscan` reports a vulnerable dependency:
 
 3. Re-run `vulnscan` to verify the fix
 4. Commit and push ✅
+
+## Suppressing False Positives
+
+Copy the template to your project to ignore accepted risks:
+
+```bash
+cp /path/to/vulnscan/.grype.yaml.template .grype.yaml
+```
+
+Then uncomment and customize the rules. Grype picks up `.grype.yaml` automatically. See [`.grype.yaml.template`](.grype.yaml.template) for examples.
 
 ## Comparison with cloud scanners
 

@@ -254,6 +254,16 @@ echo "$GRYPE_OUTPUT" | jq -r '
 SCRIPT
 
   chmod +x "${VULNSCAN_DIR}/vulnscan-summary.sh"
+
+  # Gradle init script for CycloneDX SBOM generation
+  cat > "${VULNSCAN_DIR}/cyclonedx-init.gradle" << 'GRADLE'
+initscript {
+    repositories { mavenCentral() }
+    dependencies { classpath 'org.cyclonedx:cyclonedx-gradle-plugin:2.2.1' }
+}
+allprojects { apply plugin: org.cyclonedx.gradle.CycloneDxPlugin }
+GRADLE
+
   print_success "Scripts created"
 }
 
@@ -317,7 +327,12 @@ _vulnscan_run() {
       ;;
     gradle)
       echo -e "\033[34m▶\033[0m Detected: Gradle (build.gradle)"
-      ./gradlew cyclonedxBom -q 2>/dev/null || gradle cyclonedxBom --init-script <(cat <<'INIT'
+      if [[ -f "./gradlew" ]]; then
+        ./gradlew cyclonedxBom -q 2>/dev/null
+      elif [[ -f "${HOME}/.vulnscan/cyclonedx-init.gradle" ]]; then
+        gradle cyclonedxBom --init-script "${HOME}/.vulnscan/cyclonedx-init.gradle" -q
+      else
+        gradle cyclonedxBom --init-script <(cat <<'INIT'
 initscript {
     repositories { mavenCentral() }
     dependencies { classpath 'org.cyclonedx:cyclonedx-gradle-plugin:2.2.1' }
@@ -325,6 +340,7 @@ initscript {
 allprojects { apply plugin: org.cyclonedx.gradle.CycloneDxPlugin }
 INIT
       ) -q
+      fi
       echo "sbom:build/reports/bom.json"
       ;;
     node)
@@ -376,6 +392,7 @@ vulnscan-json() {
 }
 
 alias checkscan="checkov -d . --compact --quiet"
+alias vulnscan-update="grype db update && echo '✅ Vulnerability database updated'"
 
 vulnscan-summary() {
   local target

@@ -1,0 +1,76 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  shellcheck:
+    name: ShellCheck
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install ShellCheck
+        run: sudo apt-get install -y shellcheck
+
+      - name: Lint install.sh
+        run: shellcheck install.sh
+
+      - name: Lint uninstall.sh
+        run: shellcheck uninstall.sh
+
+      - name: Lint MCP server
+        run: shellcheck integrations/mcp-server/vulnscan-mcp-server.sh
+
+      - name: Lint Kiro hook
+        run: shellcheck integrations/kiro/hooks/vulnscan-gate.sh
+
+  test-install:
+    name: Test Install (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run install script
+        run: |
+          # Run install but skip actual tool installation (just test the logic)
+          bash -n install.sh
+          echo "✔ Syntax valid"
+
+      - name: Verify script is executable
+        run: |
+          test -x install.sh && echo "✔ install.sh is executable"
+          test -x uninstall.sh && echo "✔ uninstall.sh is executable"
+          test -x integrations/mcp-server/vulnscan-mcp-server.sh && echo "✔ MCP server is executable"
+          test -x integrations/kiro/hooks/vulnscan-gate.sh && echo "✔ Kiro hook is executable"
+
+      - name: Test install (full run)
+        run: |
+          # Install on the CI runner
+          ./install.sh
+
+      - name: Verify tools installed
+        run: |
+          command -v grype && echo "✔ grype installed"
+          command -v checkov && echo "✔ checkov installed"
+          command -v jq && echo "✔ jq installed"
+
+      - name: Verify aliases were added
+        run: |
+          SHELL_RC="$HOME/.bashrc"
+          [[ "${{ matrix.os }}" == "macos-latest" ]] && SHELL_RC="$HOME/.zshrc"
+          grep -q "vulnscan" "$SHELL_RC" && echo "✔ Aliases installed in $SHELL_RC"
+
+      - name: Test uninstall
+        run: |
+          ./uninstall.sh
+          SHELL_RC="$HOME/.bashrc"
+          [[ "${{ matrix.os }}" == "macos-latest" ]] && SHELL_RC="$HOME/.zshrc"
+          ! grep -q ">>> vulnscan >>>" "$SHELL_RC" && echo "✔ Aliases removed from $SHELL_RC"

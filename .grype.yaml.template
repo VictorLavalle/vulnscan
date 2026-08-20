@@ -1,0 +1,50 @@
+# .grype.yaml - Vulnerability Suppression Configuration
+# Place this file in your project root to ignore known false positives.
+# Docs: https://github.com/anchore/grype#specifying-matches-to-ignore
+#
+# Copy this template to your project:
+#   cp /path/to/vulnscan/.grype.yaml.template .grype.yaml
+
+ignore:
+  # ──────────────────────────────────────────────────────────────
+  # Example: Ignore a specific CVE (false positive or accepted risk)
+  # ──────────────────────────────────────────────────────────────
+  # - vulnerability: GHSA-xxxx-yyyy-zzzz
+  #   reason: "Accepted risk - not exploitable in our context (reviewed 2026-01-15)"
+
+  # ──────────────────────────────────────────────────────────────
+  # Example: Ignore all vulnerabilities in a specific package
+  # ──────────────────────────────────────────────────────────────
+  # - package:
+  #     name: setuptools
+  #     type: python
+  #   reason: "Dev-only dependency, not shipped in production"
+
+  # ──────────────────────────────────────────────────────────────
+  # Example: Ignore vulnerabilities below a severity threshold
+  # ──────────────────────────────────────────────────────────────
+  # - vulnerability: GHSA-*
+  #   fix-state: unknown
+  #   reason: "Ignore vulnerabilities with no known fix"
+
+  # ──────────────────────────────────────────────────────────────
+  # Example: Ignore a specific package version (test dependency)
+  # ──────────────────────────────────────────────────────────────
+  # - package:
+  #     name: pytest
+  #     version: "8.3.5"
+  #   reason: "Test framework only, not in production classpath"
+
+  # ──────────────────────────────────────────────────────────────
+  # Example: Ignore by vulnerability ID pattern
+  # ──────────────────────────────────────────────────────────────
+  # - vulnerability: CVE-2023-*
+  #   reason: "All 2023 CVEs reviewed and accepted for this release"
+
+# ════════════════════════════════════════════════════════════════
+# TIPS:
+#   - Always include a 'reason' field for audit trail
+#   - Review suppressions regularly (quarterly recommended)
+#   - Use 'vulnscan-all' to see suppressed vulns reappear
+#   - Grype picks up .grype.yaml automatically from CWD
+# ════════════════════════════════════════════════════════════════

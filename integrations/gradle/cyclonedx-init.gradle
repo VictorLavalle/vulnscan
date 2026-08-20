@@ -1,0 +1,20 @@
+// vulnscan - Gradle Init Script for CycloneDX SBOM generation
+// This script injects the CycloneDX plugin without modifying your build.gradle
+//
+// Usage:
+//   gradle cyclonedxBom --init-script /path/to/cyclonedx-init.gradle
+//
+// Output: build/reports/bom.json
+
+initscript {
+    repositories {
+        mavenCentral()
+    }
+    dependencies {
+        classpath 'org.cyclonedx:cyclonedx-gradle-plugin:2.2.1'
+    }
+}
+
+allprojects {
+    apply plugin: org.cyclonedx.gradle.CycloneDxPlugin
+}
