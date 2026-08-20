@@ -91,29 +91,19 @@ The tool **auto-detects** your project type:
 
 ## How to fix vulnerabilities
 
-When `vulnscan` reports a vulnerable dependency:
+The `Upgrade Path` column in the scan results shows the version to upgrade to. How you apply the fix depends on your ecosystem:
 
-1. **Direct dependency** → Update the version in your `pom.xml`
-2. **Transitive dependency** → Add a version override in `<dependencyManagement>`
+| Ecosystem | How to fix |
+|-----------|-----------|
+| Maven | Update version in `pom.xml` or add `<dependencyManagement>` override |
+| Gradle | Update version in `build.gradle` or add `constraints` block |
+| Node.js | `npm update <package>` or edit `package.json` |
+| Python | `pip install --upgrade <package>` or edit `requirements.txt` |
+| Go | `go get <package>@latest` |
+| .NET | `dotnet add package <package> --version <version>` |
+| Rust | `cargo update -p <package>` |
 
-```xml
-<properties>
-    <httpcore5.version>5.4.3</httpcore5.version>
-</properties>
-
-<dependencyManagement>
-    <dependencies>
-        <dependency>
-            <groupId>org.apache.httpcomponents.core5</groupId>
-            <artifactId>httpcore5</artifactId>
-            <version>${httpcore5.version}</version>
-        </dependency>
-    </dependencies>
-</dependencyManagement>
-```
-
-3. Re-run `vulnscan` to verify the fix
-4. Commit and push ✅
+After fixing, re-run `vulnscan` to verify the vulnerability is gone.
 
 ## Suppressing False Positives
 
