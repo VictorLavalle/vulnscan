@@ -123,6 +123,45 @@ When `vulnscan` reports a vulnerable dependency:
 
 > **Best practice:** Use `vulnscan` locally to catch Java dependency CVEs before pushing. Let cloud scanners handle OS-level vulnerabilities in base images.
 
+## AI Agent Integrations
+
+vulnscan integrates with AI coding assistants for automated security workflows:
+
+| Integration | Use Case | Location |
+|-------------|----------|----------|
+| [**Kiro Skill**](integrations/kiro/skills/vulnscan/SKILL.md) | `/vulnscan` slash command in Kiro CLI | `integrations/kiro/skills/` |
+| [**Kiro Hook**](integrations/kiro/hooks/README.md) | Blocks `git push` on Critical/High vulns | `integrations/kiro/hooks/` |
+| [**GitHub Action**](integrations/github-action/README.md) | PR scanner with comment & check | `integrations/github-action/` |
+| [**MCP Server**](integrations/mcp-server/README.md) | Tool for Claude, Codex, Cursor, any MCP client | `integrations/mcp-server/` |
+
+### Quick setup examples
+
+**Kiro Skill** — scan on demand:
+```bash
+cp -r integrations/kiro/skills/vulnscan ~/.kiro/skills/
+# Then in Kiro: /vulnscan
+```
+
+**Kiro Hook** — block push with vulns:
+```bash
+cp integrations/kiro/hooks/vulnscan-gate.sh ~/.kiro/hooks/
+chmod +x ~/.kiro/hooks/vulnscan-gate.sh
+# Add to .kiro/agents/your-agent.json (see integrations/kiro/hooks/README.md)
+```
+
+**GitHub Action** — PR scanner:
+```bash
+cp integrations/github-action/vulnscan.yml .github/workflows/
+# Done — triggers on PRs that modify dependency files
+```
+
+**MCP Server** — AI agent tool:
+```bash
+cp integrations/mcp-server/vulnscan-mcp-server.sh ~/.local/bin/
+chmod +x ~/.local/bin/vulnscan-mcp-server
+# Add to your MCP config (see integrations/mcp-server/README.md)
+```
+
 ## Requirements
 
 - macOS or Linux
