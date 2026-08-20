@@ -64,12 +64,26 @@ detect_shell() {
     SHELL_RC="${HOME}/.zshrc"
     SHELL_NAME="zsh"
   elif [[ -n "${BASH_VERSION:-}" ]] || [[ "$SHELL" == */bash ]]; then
-    SHELL_RC="${HOME}/.bashrc"
+    # macOS uses .bash_profile for login shells, Linux uses .bashrc
+    if [[ "$OS" == "macos" ]] && [[ -f "${HOME}/.bash_profile" ]]; then
+      SHELL_RC="${HOME}/.bash_profile"
+    elif [[ -f "${HOME}/.bashrc" ]]; then
+      SHELL_RC="${HOME}/.bashrc"
+    else
+      SHELL_RC="${HOME}/.bash_profile"
+    fi
     SHELL_NAME="bash"
+  elif [[ "$SHELL" == */fish ]]; then
+    SHELL_RC="${HOME}/.config/fish/config.fish"
+    SHELL_NAME="fish"
   else
     SHELL_RC="${HOME}/.profile"
     SHELL_NAME="sh"
   fi
+
+  # Ensure the file exists
+  mkdir -p "$(dirname "$SHELL_RC")"
+  touch "$SHELL_RC"
 }
 
 # Check if a command exists
@@ -280,6 +294,96 @@ install_shell_aliases() {
 
   print_step "Adding aliases to ${SHELL_RC}..."
 
+  # Fish shell uses different syntax
+  if [[ "$SHELL_NAME" == "fish" ]]; then
+    cat >> "$SHELL_RC" << 'FISH_ALIASES'
+
+# >>> vulnscan >>>
+# Local vulnerability scanning (no API keys needed)
+# https://github.com/VictorLavalle/Vulns-Scan
+
+function _vulnscan_detect
+    if test -f "pom.xml"
+        echo "maven"
+    else if test -f "build.gradle" -o -f "build.gradle.kts"
+        echo "gradle"
+    else if test -f "package-lock.json" -o -f "yarn.lock" -o -f "pnpm-lock.yaml"
+        echo "node"
+    else if test -f "requirements.txt" -o -f "Pipfile.lock" -o -f "poetry.lock" -o -f "uv.lock"
+        echo "python"
+    else if test -f "go.sum"
+        echo "go"
+    else if test -f "packages.lock.json"
+        echo "dotnet"
+    else if test -f "Cargo.lock"
+        echo "rust"
+    else
+        echo "unknown"
+    end
+end
+
+function _vulnscan_run
+    set -l project_type (_vulnscan_detect)
+    switch $project_type
+        case maven
+            echo "▶ Detected: Maven (pom.xml)" >&2
+            mvn org.cyclonedx:cyclonedx-maven-plugin:makeBom -q 2>/dev/null
+            echo "sbom:target/bom.json"
+        case gradle
+            echo "▶ Detected: Gradle (build.gradle)" >&2
+            if test -f "./gradlew"
+                ./gradlew cyclonedxBom -q 2>/dev/null
+            else if test -f "$HOME/.vulnscan/cyclonedx-init.gradle"
+                gradle cyclonedxBom --init-script "$HOME/.vulnscan/cyclonedx-init.gradle" -q
+            end
+            echo "sbom:build/reports/bom.json"
+        case node
+            echo "▶ Detected: Node.js" >&2
+            echo "dir:."
+        case python
+            echo "▶ Detected: Python" >&2
+            echo "dir:."
+        case go
+            echo "▶ Detected: Go" >&2
+            echo "dir:."
+        case dotnet
+            echo "▶ Detected: .NET" >&2
+            echo "dir:."
+        case rust
+            echo "▶ Detected: Rust" >&2
+            echo "dir:."
+        case '*'
+            echo "✖ No supported project detected." >&2
+            echo "  Supported: Maven, Gradle, Node.js, Python, Go, .NET, Rust" >&2
+            return 1
+    end
+end
+
+function vulnscan
+    set -l target (_vulnscan_run); or return 1
+    grype "$target" --sort-by severity --only-fixed
+end
+
+function vulnscan-all
+    set -l target (_vulnscan_run); or return 1
+    grype "$target" --sort-by severity
+end
+
+function vulnscan-json
+    set -l target (_vulnscan_run); or return 1
+    grype "$target" -o json > vuln-report.json
+    echo "Report: vuln-report.json"
+end
+
+alias checkscan="checkov -d . --compact --quiet"
+alias vulnscan-update="grype db update; and echo '✅ Vulnerability database updated'"
+# <<< vulnscan <<<
+FISH_ALIASES
+    print_success "Fish aliases added to ${SHELL_RC}"
+    return
+  fi
+
+  # Bash/Zsh/sh aliases
   cat >> "$SHELL_RC" << 'ALIASES'
 
 # >>> vulnscan >>>

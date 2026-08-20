@@ -4,12 +4,29 @@ set -euo pipefail
 echo "🗑️  Uninstalling vulnscan..."
 
 # Detect shell config
-if [[ -f "${HOME}/.zshrc" ]]; then
+SHELL_RC=""
+if [[ "$SHELL" == */zsh ]] && [[ -f "${HOME}/.zshrc" ]]; then
   SHELL_RC="${HOME}/.zshrc"
-elif [[ -f "${HOME}/.bashrc" ]]; then
-  SHELL_RC="${HOME}/.bashrc"
-else
+elif [[ "$SHELL" == */bash ]]; then
+  if [[ -f "${HOME}/.bash_profile" ]] && grep -q "vulnscan" "${HOME}/.bash_profile" 2>/dev/null; then
+    SHELL_RC="${HOME}/.bash_profile"
+  elif [[ -f "${HOME}/.bashrc" ]]; then
+    SHELL_RC="${HOME}/.bashrc"
+  fi
+elif [[ "$SHELL" == */fish ]] && [[ -f "${HOME}/.config/fish/config.fish" ]]; then
+  SHELL_RC="${HOME}/.config/fish/config.fish"
+elif [[ -f "${HOME}/.profile" ]]; then
   SHELL_RC="${HOME}/.profile"
+fi
+
+# Fallback: find which file has vulnscan
+if [[ -z "$SHELL_RC" ]]; then
+  for rc in "${HOME}/.zshrc" "${HOME}/.bashrc" "${HOME}/.bash_profile" "${HOME}/.config/fish/config.fish" "${HOME}/.profile"; do
+    if grep -q ">>> vulnscan >>>" "$rc" 2>/dev/null; then
+      SHELL_RC="$rc"
+      break
+    fi
+  done
 fi
 
 # Remove aliases from shell config
