@@ -176,15 +176,31 @@ create_scripts() {
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Generate SBOM and scan
+# Auto-detect project type and generate SBOM
 echo "📦 Generating SBOM..."
-mvn org.cyclonedx:cyclonedx-maven-plugin:makeBom -q 2>/dev/null
+if [[ -f "pom.xml" ]]; then
+  mvn org.cyclonedx:cyclonedx-maven-plugin:makeBom -q 2>/dev/null
+  BOM_PATH="target/bom.json"
+elif [[ -f "build.gradle" || -f "build.gradle.kts" ]]; then
+  ./gradlew cyclonedxBom -q 2>/dev/null || gradle cyclonedxBom --init-script <(cat <<'INIT'
+initscript {
+    repositories { mavenCentral() }
+    dependencies { classpath 'org.cyclonedx:cyclonedx-gradle-plugin:2.2.1' }
+}
+allprojects { apply plugin: org.cyclonedx.gradle.CycloneDxPlugin }
+INIT
+  ) -q
+  BOM_PATH="build/reports/bom.json"
+else
+  echo "ERROR: No pom.xml or build.gradle found" >&2
+  exit 1
+fi
 
 echo ""
 echo "🔍 Scanning for vulnerabilities..."
 echo ""
 
-GRYPE_OUTPUT=$(grype sbom:target/bom.json --sort-by severity -o json 2>/dev/null)
+GRYPE_OUTPUT=$(grype "sbom:$BOM_PATH" --sort-by severity -o json 2>/dev/null)
 
 if echo "$GRYPE_OUTPUT" | jq -e '.matches | length == 0' &>/dev/null; then
   echo "🎉 No vulnerabilities found!"
@@ -241,14 +257,37 @@ install_shell_aliases() {
 # >>> vulnscan >>>
 # Local vulnerability scanning (no API keys needed)
 # https://github.com/VictorLavalle/Vulns-Scan
-alias vulnscan="mvn org.cyclonedx:cyclonedx-maven-plugin:makeBom -q && grype sbom:target/bom.json --sort-by severity --only-fixed"
-alias vulnscan-all="mvn org.cyclonedx:cyclonedx-maven-plugin:makeBom -q && grype sbom:target/bom.json --sort-by severity"
-alias vulnscan-json="mvn org.cyclonedx:cyclonedx-maven-plugin:makeBom -q && grype sbom:target/bom.json -o json > target/vuln-report.json && echo 'Report: target/vuln-report.json'"
+
+# Auto-detect project type and generate SBOM
+_vulnscan_sbom() {
+  if [[ -f "pom.xml" ]]; then
+    mvn org.cyclonedx:cyclonedx-maven-plugin:makeBom -q
+    echo "target/bom.json"
+  elif [[ -f "build.gradle" || -f "build.gradle.kts" ]]; then
+    ./gradlew cyclonedxBom -q 2>/dev/null || gradle cyclonedxBom --init-script <(cat <<'INIT'
+initscript {
+    repositories { mavenCentral() }
+    dependencies { classpath 'org.cyclonedx:cyclonedx-gradle-plugin:2.2.1' }
+}
+allprojects { apply plugin: org.cyclonedx.gradle.CycloneDxPlugin }
+INIT
+    ) -q
+    echo "build/reports/bom.json"
+  else
+    echo "ERROR: No pom.xml or build.gradle found" >&2
+    return 1
+  fi
+}
+
+alias vulnscan='_bom=$(_vulnscan_sbom) && grype "sbom:$_bom" --sort-by severity --only-fixed'
+alias vulnscan-all='_bom=$(_vulnscan_sbom) && grype "sbom:$_bom" --sort-by severity'
+alias vulnscan-json='_bom=$(_vulnscan_sbom) && grype "sbom:$_bom" -o json > target/vuln-report.json && echo "Report: target/vuln-report.json"'
 alias checkscan="checkov -d . --compact --quiet"
 vulnscan-summary() {
-  mvn org.cyclonedx:cyclonedx-maven-plugin:makeBom -q && \
+  local _bom
+  _bom=$(_vulnscan_sbom) || return 1
   echo "" && \
-  grype sbom:target/bom.json --sort-by severity -o json 2>/dev/null | \
+  grype "sbom:$_bom" --sort-by severity -o json 2>/dev/null | \
   jq -r '
     [.matches[] | {
       name: .artifact.name,

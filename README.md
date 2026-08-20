@@ -1,6 +1,6 @@
 # 🛡️ vulnscan
 
-Local dependency vulnerability scanning for Maven projects. No API keys. No cloud credentials. Just results.
+Local dependency vulnerability scanning for **Maven and Gradle** projects. No API keys. No cloud credentials. Just results.
 
 <img width="882" height="356" alt="image" src="https://github.com/user-attachments/assets/cac178f8-c107-49fe-a950-259eeb4dbcce" />
 
@@ -49,9 +49,13 @@ After installation, these commands are available in any Maven project:
 ## Usage
 
 ```bash
-cd your-maven-project
+cd your-maven-or-gradle-project
 vulnscan-summary
 ```
+
+The tool **auto-detects** your project type:
+- `pom.xml` found → uses Maven CycloneDX plugin
+- `build.gradle` or `build.gradle.kts` found → uses Gradle CycloneDX plugin (no need to add it to your build file)
 
 ### Example output
 
@@ -112,7 +116,8 @@ When `vulnscan` reports a vulnerable dependency:
 ## Requirements
 
 - macOS or Linux
-- Java 11+ and Maven 3.x
+- Java 11+
+- Maven 3.x **or** Gradle 7+ (auto-detected)
 - Homebrew (macOS) or curl (Linux)
 
 ## Uninstall
@@ -132,11 +137,11 @@ rm -rf ~/.vulnscan
 ## Contributing
 
 PRs welcome! If you'd like to add support for:
-- Gradle projects
 - Node.js / npm / yarn
 - Python / pip
 - Go modules
 - .NET / NuGet
+- Rust / Cargo
 
 Open an issue or submit a PR.
 
