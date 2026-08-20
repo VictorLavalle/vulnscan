@@ -1,6 +1,8 @@
 # 🛡️ vulnscan
 
-Local dependency vulnerability scanning for **Maven and Gradle** projects. No API keys. No cloud credentials. Just results.
+Local dependency vulnerability scanning for **any project**. No API keys. No cloud credentials. Just results.
+
+Supports: **Java/Kotlin** (Maven, Gradle) · **Node.js** (npm, yarn, pnpm) · **Python** (pip, Pipenv, Poetry, uv) · **Go** · **.NET** (NuGet) · **Rust** (Cargo)
 
 <img width="882" height="356" alt="image" src="https://github.com/user-attachments/assets/cac178f8-c107-49fe-a950-259eeb4dbcce" />
 
@@ -49,13 +51,21 @@ After installation, these commands are available in any Maven project:
 ## Usage
 
 ```bash
-cd your-maven-or-gradle-project
+cd your-project
 vulnscan-summary
 ```
 
 The tool **auto-detects** your project type:
-- `pom.xml` found → uses Maven CycloneDX plugin
-- `build.gradle` or `build.gradle.kts` found → uses Gradle CycloneDX plugin (no need to add it to your build file)
+
+| Ecosystem | Detected by | Method |
+|-----------|------------|--------|
+| Java/Kotlin (Maven) | `pom.xml` | SBOM via CycloneDX plugin |
+| Java/Kotlin (Gradle) | `build.gradle` / `build.gradle.kts` | SBOM via CycloneDX plugin (injected, no build file changes) |
+| Node.js | `package-lock.json` / `yarn.lock` / `pnpm-lock.yaml` | Direct lockfile scan |
+| Python | `requirements.txt` / `Pipfile.lock` / `poetry.lock` / `uv.lock` | Direct lockfile scan |
+| Go | `go.sum` | Direct lockfile scan |
+| .NET | `packages.lock.json` / `*.csproj` | Direct lockfile scan |
+| Rust | `Cargo.lock` | Direct lockfile scan |
 
 ### Example output
 
@@ -106,7 +116,7 @@ When `vulnscan` reports a vulnerable dependency:
 |---------|-----------------|---------------------|
 | **When** | Before push (~5s) | After deploy (minutes) |
 | **API key** | ❌ Not needed | ✅ Required |
-| **Java deps** | ✅ | ✅ |
+| **Languages** | Java, Kotlin, Node.js, Python, Go, .NET, Rust | All |
 | **OS-level vulns** | ❌ | ✅ |
 | **Custom policies** | ❌ | ✅ |
 | **Cost** | Free | Paid |
@@ -116,9 +126,9 @@ When `vulnscan` reports a vulnerable dependency:
 ## Requirements
 
 - macOS or Linux
-- Java 11+
-- Maven 3.x **or** Gradle 7+ (auto-detected)
 - Homebrew (macOS) or curl (Linux)
+- For Java/Kotlin: Java 11+ and Maven 3.x or Gradle 7+
+- For other ecosystems: just the lockfile (no build tools needed for scanning)
 
 ## Uninstall
 
@@ -136,12 +146,11 @@ rm -rf ~/.vulnscan
 
 ## Contributing
 
-PRs welcome! If you'd like to add support for:
-- Node.js / npm / yarn
-- Python / pip
-- Go modules
-- .NET / NuGet
-- Rust / Cargo
+PRs welcome! Ideas for future support:
+- PHP (Composer)
+- Ruby (Bundler)
+- Swift (Package.resolved)
+- Dart/Flutter (pubspec.lock)
 
 Open an issue or submit a PR.
 
