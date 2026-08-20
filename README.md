@@ -6,7 +6,13 @@
 
 Local dependency vulnerability scanning for **any project**. No API keys. No cloud credentials. Just results.
 
-Supports: **Java/Kotlin** (Maven, Gradle) · **Node.js** (npm, yarn, pnpm) · **Python** (pip, Pipenv, Poetry, uv) · **Go** · **.NET** (NuGet) · **Rust** (Cargo)
+Supports:
+- **Java/Kotlin** (Maven, Gradle)
+- **Node.js** (npm, yarn, pnpm)
+- **Python** (pip, Pipenv, Poetry, uv)
+- **Go**
+- **.NET** (NuGet)
+- **Rust** (Cargo)
 
 <img width="882" height="356" alt="image" src="https://github.com/user-attachments/assets/cac178f8-c107-49fe-a950-259eeb4dbcce" />
 
