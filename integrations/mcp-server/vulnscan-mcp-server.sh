@@ -56,7 +56,7 @@ run_scan() {
       target="sbom:$dir/target/bom.json"
       ;;
     gradle)
-      (cd "$dir" && ./gradlew cyclonedxBom -q 2>/dev/null || true)
+      (cd "$dir" && ./gradlew cyclonedxBom -q 2>/dev/null) || true
       target="sbom:$dir/build/reports/bom.json"
       ;;
     *)
