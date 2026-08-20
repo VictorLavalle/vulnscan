@@ -271,10 +271,11 @@ GRADLE
 install_shell_aliases() {
   local marker="# >>> vulnscan >>>"
 
-  # Check if already installed
+  # If already installed, remove old version and reinstall (auto-update)
   if grep -q "$marker" "$SHELL_RC" 2>/dev/null; then
-    print_success "Shell aliases already configured in ${SHELL_RC}"
-    return
+    print_step "Updating existing vulnscan aliases in ${SHELL_RC}..."
+    sed -i.bak '/# >>> vulnscan >>>/,/# <<< vulnscan <<</d' "$SHELL_RC"
+    rm -f "${SHELL_RC}.bak"
   fi
 
   print_step "Adding aliases to ${SHELL_RC}..."
