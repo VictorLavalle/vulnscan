@@ -2,7 +2,8 @@
 
 Local dependency vulnerability scanning for Maven projects. No API keys. No cloud credentials. Just results.
 
-![vulnscan-summary output](docs/vulnscan-summary.png)
+<img width="882" height="356" alt="image" src="https://github.com/user-attachments/assets/cac178f8-c107-49fe-a950-259eeb4dbcce" />
+
 
 ## Why?
 
