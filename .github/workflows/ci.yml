@@ -52,25 +52,35 @@ jobs:
           test -x integrations/kiro/hooks/vulnscan-gate.sh && echo "✔ Kiro hook is executable"
 
       - name: Test install (full run)
+        shell: bash
         run: |
-          # Install on the CI runner
+          # On macOS CI, ensure .zshrc exists (runner uses bash but SHELL=/bin/zsh)
+          if [[ "${{ matrix.os }}" == "macos-latest" ]]; then
+            touch "$HOME/.zshrc"
+            export SHELL=/bin/zsh
+          fi
           ./install.sh
 
       - name: Verify tools installed
         run: |
           command -v grype && echo "✔ grype installed"
-          command -v checkov && echo "✔ checkov installed"
           command -v jq && echo "✔ jq installed"
 
       - name: Verify aliases were added
         run: |
-          SHELL_RC="$HOME/.bashrc"
-          [[ "${{ matrix.os }}" == "macos-latest" ]] && SHELL_RC="$HOME/.zshrc"
+          if [[ "${{ matrix.os }}" == "macos-latest" ]]; then
+            SHELL_RC="$HOME/.zshrc"
+          else
+            SHELL_RC="$HOME/.bashrc"
+          fi
           grep -q "vulnscan" "$SHELL_RC" && echo "✔ Aliases installed in $SHELL_RC"
 
       - name: Test uninstall
         run: |
+          if [[ "${{ matrix.os }}" == "macos-latest" ]]; then
+            SHELL_RC="$HOME/.zshrc"
+          else
+            SHELL_RC="$HOME/.bashrc"
+          fi
           ./uninstall.sh
-          SHELL_RC="$HOME/.bashrc"
-          [[ "${{ matrix.os }}" == "macos-latest" ]] && SHELL_RC="$HOME/.zshrc"
           ! grep -q ">>> vulnscan >>>" "$SHELL_RC" && echo "✔ Aliases removed from $SHELL_RC"

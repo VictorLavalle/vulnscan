@@ -64,13 +64,13 @@ run_scan() {
       ;;
   esac
 
-  local grype_args="--sort-by severity --only-fixed -o json"
+  local grype_args=(--sort-by severity --only-fixed -o json)
   if [[ -n "$severity_filter" ]]; then
-    grype_args="$grype_args --fail-on $severity_filter"
+    grype_args+=(--fail-on "$severity_filter")
   fi
 
   local result
-  result=$(grype "$target" $grype_args 2>/dev/null || true)
+  result=$(grype "$target" "${grype_args[@]}" 2>/dev/null || true)
   echo "$result"
 }
 

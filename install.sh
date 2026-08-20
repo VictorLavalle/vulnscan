@@ -270,7 +270,6 @@ GRADLE
 # Add shell aliases
 install_shell_aliases() {
   local marker="# >>> vulnscan >>>"
-  local marker_end="# <<< vulnscan <<<"
 
   # Check if already installed
   if grep -q "$marker" "$SHELL_RC" 2>/dev/null; then
