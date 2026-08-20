@@ -14,7 +14,7 @@ set -euo pipefail
 #   ./install.sh
 # ============================================================================
 
-VERSION="1.0.0"
+VERSION="1.1.0"
 SHELL_RC=""
 VULNSCAN_DIR="${HOME}/.vulnscan"
 
@@ -177,11 +177,13 @@ create_scripts() {
 set -euo pipefail
 
 # Auto-detect project type and generate SBOM
-echo "📦 Generating SBOM..."
+echo "📦 Detecting project type..."
 if [[ -f "pom.xml" ]]; then
+  echo "   Maven project detected"
   mvn org.cyclonedx:cyclonedx-maven-plugin:makeBom -q 2>/dev/null
-  BOM_PATH="target/bom.json"
+  TARGET="sbom:target/bom.json"
 elif [[ -f "build.gradle" || -f "build.gradle.kts" ]]; then
+  echo "   Gradle project detected"
   ./gradlew cyclonedxBom -q 2>/dev/null || gradle cyclonedxBom --init-script <(cat <<'INIT'
 initscript {
     repositories { mavenCentral() }
@@ -190,9 +192,25 @@ initscript {
 allprojects { apply plugin: org.cyclonedx.gradle.CycloneDxPlugin }
 INIT
   ) -q
-  BOM_PATH="build/reports/bom.json"
+  TARGET="sbom:build/reports/bom.json"
+elif [[ -f "package-lock.json" || -f "yarn.lock" || -f "pnpm-lock.yaml" ]]; then
+  echo "   Node.js project detected"
+  TARGET="dir:."
+elif [[ -f "requirements.txt" || -f "Pipfile.lock" || -f "poetry.lock" || -f "uv.lock" ]]; then
+  echo "   Python project detected"
+  TARGET="dir:."
+elif [[ -f "go.sum" ]]; then
+  echo "   Go project detected"
+  TARGET="dir:."
+elif [[ -f "packages.lock.json" ]] || ls *.csproj &>/dev/null; then
+  echo "   .NET project detected"
+  TARGET="dir:."
+elif [[ -f "Cargo.lock" ]]; then
+  echo "   Rust project detected"
+  TARGET="dir:."
 else
-  echo "ERROR: No pom.xml or build.gradle found" >&2
+  echo "ERROR: No supported project detected" >&2
+  echo "Supported: Maven, Gradle, Node.js, Python, Go, .NET, Rust" >&2
   exit 1
 fi
 
@@ -200,7 +218,7 @@ echo ""
 echo "🔍 Scanning for vulnerabilities..."
 echo ""
 
-GRYPE_OUTPUT=$(grype "sbom:$BOM_PATH" --sort-by severity -o json 2>/dev/null)
+GRYPE_OUTPUT=$(grype "$TARGET" --sort-by severity -o json 2>/dev/null)
 
 if echo "$GRYPE_OUTPUT" | jq -e '.matches | length == 0' &>/dev/null; then
   echo "🎉 No vulnerabilities found!"
@@ -258,36 +276,112 @@ install_shell_aliases() {
 # Local vulnerability scanning (no API keys needed)
 # https://github.com/VictorLavalle/Vulns-Scan
 
-# Auto-detect project type and generate SBOM
-_vulnscan_sbom() {
+# Auto-detect project type and scan
+_vulnscan_detect() {
+  # Java/Kotlin - Maven
   if [[ -f "pom.xml" ]]; then
-    mvn org.cyclonedx:cyclonedx-maven-plugin:makeBom -q
-    echo "target/bom.json"
+    echo "maven"
+  # Java/Kotlin - Gradle
   elif [[ -f "build.gradle" || -f "build.gradle.kts" ]]; then
-    ./gradlew cyclonedxBom -q 2>/dev/null || gradle cyclonedxBom --init-script <(cat <<'INIT'
+    echo "gradle"
+  # Node.js
+  elif [[ -f "package-lock.json" || -f "yarn.lock" || -f "pnpm-lock.yaml" ]]; then
+    echo "node"
+  # Python
+  elif [[ -f "requirements.txt" || -f "Pipfile.lock" || -f "poetry.lock" || -f "uv.lock" ]]; then
+    echo "python"
+  # Go
+  elif [[ -f "go.sum" ]]; then
+    echo "go"
+  # .NET
+  elif [[ -f "packages.lock.json" ]] || ls *.csproj &>/dev/null; then
+    echo "dotnet"
+  # Rust
+  elif [[ -f "Cargo.lock" ]]; then
+    echo "rust"
+  else
+    echo "unknown"
+  fi
+}
+
+_vulnscan_run() {
+  local mode="${1:-dir}"  # "sbom" for Maven/Gradle, "dir" for everything else
+  local project_type
+  project_type=$(_vulnscan_detect)
+
+  case "$project_type" in
+    maven)
+      echo -e "\033[34m▶\033[0m Detected: Maven (pom.xml)"
+      mvn org.cyclonedx:cyclonedx-maven-plugin:makeBom -q 2>/dev/null
+      echo "sbom:target/bom.json"
+      ;;
+    gradle)
+      echo -e "\033[34m▶\033[0m Detected: Gradle (build.gradle)"
+      ./gradlew cyclonedxBom -q 2>/dev/null || gradle cyclonedxBom --init-script <(cat <<'INIT'
 initscript {
     repositories { mavenCentral() }
     dependencies { classpath 'org.cyclonedx:cyclonedx-gradle-plugin:2.2.1' }
 }
 allprojects { apply plugin: org.cyclonedx.gradle.CycloneDxPlugin }
 INIT
-    ) -q
-    echo "build/reports/bom.json"
-  else
-    echo "ERROR: No pom.xml or build.gradle found" >&2
-    return 1
-  fi
+      ) -q
+      echo "sbom:build/reports/bom.json"
+      ;;
+    node)
+      echo -e "\033[34m▶\033[0m Detected: Node.js"
+      echo "dir:."
+      ;;
+    python)
+      echo -e "\033[34m▶\033[0m Detected: Python"
+      echo "dir:."
+      ;;
+    go)
+      echo -e "\033[34m▶\033[0m Detected: Go"
+      echo "dir:."
+      ;;
+    dotnet)
+      echo -e "\033[34m▶\033[0m Detected: .NET"
+      echo "dir:."
+      ;;
+    rust)
+      echo -e "\033[34m▶\033[0m Detected: Rust"
+      echo "dir:."
+      ;;
+    *)
+      echo -e "\033[31m✖\033[0m No supported project detected in current directory." >&2
+      echo "  Supported: Maven, Gradle, Node.js, Python, Go, .NET, Rust" >&2
+      return 1
+      ;;
+  esac
 }
 
-alias vulnscan='_bom=$(_vulnscan_sbom) && grype "sbom:$_bom" --sort-by severity --only-fixed'
-alias vulnscan-all='_bom=$(_vulnscan_sbom) && grype "sbom:$_bom" --sort-by severity'
-alias vulnscan-json='_bom=$(_vulnscan_sbom) && grype "sbom:$_bom" -o json > target/vuln-report.json && echo "Report: target/vuln-report.json"'
+vulnscan() {
+  local target
+  target=$(_vulnscan_run) || return 1
+  grype "$target" --sort-by severity --only-fixed
+}
+
+vulnscan-all() {
+  local target
+  target=$(_vulnscan_run) || return 1
+  grype "$target" --sort-by severity
+}
+
+vulnscan-json() {
+  local target
+  target=$(_vulnscan_run) || return 1
+  local output="vuln-report.json"
+  grype "$target" -o json > "$output"
+  echo "Report: $output"
+}
+
 alias checkscan="checkov -d . --compact --quiet"
+
 vulnscan-summary() {
-  local _bom
-  _bom=$(_vulnscan_sbom) || return 1
-  echo "" && \
-  grype "sbom:$_bom" --sort-by severity -o json 2>/dev/null | \
+  local target
+  target=$(_vulnscan_run) || return 1
+  echo ""
+  grype "$target" --sort-by severity -o json 2>/dev/null | \
   jq -r '
     [.matches[] | {
       name: .artifact.name,
@@ -296,6 +390,7 @@ vulnscan-summary() {
       severity: .vulnerability.severity,
       id: .vulnerability.id
     }] |
+    if length == 0 then "🎉 No vulnerabilities found!" else
     group_by(.name) |
     sort_by(-(.[0] | if .severity == "Critical" then 4 elif .severity == "High" then 3 elif .severity == "Medium" then 2 else 1 end)) |
     length as $libs |
@@ -313,6 +408,7 @@ vulnscan-summary() {
       "│ \($sev)\(" " * (8 - (.[0].severity | length))) │ \($name)\(" " * (31 - ($name | length))) │ \($path)\(" " * (23 - ($path | length))) │ \($count)\(" " * (4 - ($count | length))) │ \($ghsas)\(" " * (43 - ($ghsas | length))) │"
     ] | join("\n")) +
     "\n└──────────┴─────────────────────────────────┴─────────────────────────┴──────┴─────────────────────────────────────────────┘"
+    end
   '
 }
 # <<< vulnscan <<<
@@ -337,8 +433,10 @@ print_summary() {
   echo -e "    ${BOLD}vulnscan-json${NC}    Export results to JSON"
   echo -e "    ${BOLD}checkscan${NC}        Scan IaC, Dockerfiles, secrets (failures only)"
   echo ""
-  echo "  Run from the root of any Maven project:"
+  echo "  Run from the root of any project:"
   echo -e "    ${BOLD}cd your-project && vulnscan-summary${NC}"
+  echo ""
+  echo "  Supported: Maven, Gradle, Node.js, Python, Go, .NET, Rust"
   echo ""
 }
 
