@@ -1,0 +1,13 @@
+{
+  "name": "secure-dev",
+  "description": "Development agent with vulnerability scanning gate on git push",
+  "hooks": {
+    "preToolUse": [
+      {
+        "matcher": "shell",
+        "command": "~/.kiro/hooks/vulnscan-gate.sh",
+        "timeout_ms": 60000
+      }
+    ]
+  }
+}
