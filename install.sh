@@ -320,12 +320,12 @@ _vulnscan_run() {
 
   case "$project_type" in
     maven)
-      echo -e "\033[34m▶\033[0m Detected: Maven (pom.xml)"
+      echo -e "\033[34m▶\033[0m Detected: Maven (pom.xml)" >&2
       mvn org.cyclonedx:cyclonedx-maven-plugin:makeBom -q 2>/dev/null
       echo "sbom:target/bom.json"
       ;;
     gradle)
-      echo -e "\033[34m▶\033[0m Detected: Gradle (build.gradle)"
+      echo -e "\033[34m▶\033[0m Detected: Gradle (build.gradle)" >&2
       if [[ -f "./gradlew" ]]; then
         ./gradlew cyclonedxBom -q 2>/dev/null
       elif [[ -f "${HOME}/.vulnscan/cyclonedx-init.gradle" ]]; then
@@ -343,23 +343,23 @@ INIT
       echo "sbom:build/reports/bom.json"
       ;;
     node)
-      echo -e "\033[34m▶\033[0m Detected: Node.js"
+      echo -e "\033[34m▶\033[0m Detected: Node.js" >&2
       echo "dir:."
       ;;
     python)
-      echo -e "\033[34m▶\033[0m Detected: Python"
+      echo -e "\033[34m▶\033[0m Detected: Python" >&2
       echo "dir:."
       ;;
     go)
-      echo -e "\033[34m▶\033[0m Detected: Go"
+      echo -e "\033[34m▶\033[0m Detected: Go" >&2
       echo "dir:."
       ;;
     dotnet)
-      echo -e "\033[34m▶\033[0m Detected: .NET"
+      echo -e "\033[34m▶\033[0m Detected: .NET" >&2
       echo "dir:."
       ;;
     rust)
-      echo -e "\033[34m▶\033[0m Detected: Rust"
+      echo -e "\033[34m▶\033[0m Detected: Rust" >&2
       echo "dir:."
       ;;
     *)
