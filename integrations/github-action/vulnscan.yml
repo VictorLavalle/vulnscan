@@ -1,0 +1,213 @@
+# vulnscan - GitHub Action Workflow
+# Copy this file to your project: .github/workflows/vulnscan.yml
+#
+# Scans dependencies for vulnerabilities on every PR.
+# Posts results as a PR comment and fails the check on Critical/High severity.
+
+name: 🛡️ Vulnerability Scan
+
+on:
+  pull_request:
+    branches: [main, master, develop]
+    paths:
+      # Maven
+      - 'pom.xml'
+      - '**/pom.xml'
+      # Gradle
+      - 'build.gradle'
+      - 'build.gradle.kts'
+      - '**/build.gradle'
+      - '**/build.gradle.kts'
+      # Node.js
+      - 'package-lock.json'
+      - 'yarn.lock'
+      - 'pnpm-lock.yaml'
+      # Python
+      - 'requirements.txt'
+      - 'Pipfile.lock'
+      - 'poetry.lock'
+      - 'uv.lock'
+      # Go
+      - 'go.sum'
+      # .NET
+      - 'packages.lock.json'
+      - '**/*.csproj'
+      # Rust
+      - 'Cargo.lock'
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  vulnscan:
+    name: Dependency Vulnerability Scan
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install Grype
+        run: |
+          curl -sSfL https://raw.githubusercontent.com/anchore/grype/main/install.sh | sh -s -- -b /usr/local/bin
+
+      - name: Detect project type
+        id: detect
+        run: |
+          if [[ -f "pom.xml" ]]; then
+            echo "type=maven" >> $GITHUB_OUTPUT
+          elif [[ -f "build.gradle" || -f "build.gradle.kts" ]]; then
+            echo "type=gradle" >> $GITHUB_OUTPUT
+          elif [[ -f "package-lock.json" || -f "yarn.lock" || -f "pnpm-lock.yaml" ]]; then
+            echo "type=node" >> $GITHUB_OUTPUT
+          elif [[ -f "requirements.txt" || -f "Pipfile.lock" || -f "poetry.lock" || -f "uv.lock" ]]; then
+            echo "type=python" >> $GITHUB_OUTPUT
+          elif [[ -f "go.sum" ]]; then
+            echo "type=go" >> $GITHUB_OUTPUT
+          elif [[ -f "Cargo.lock" ]]; then
+            echo "type=rust" >> $GITHUB_OUTPUT
+          elif [[ -f "packages.lock.json" ]] || ls *.csproj &>/dev/null; then
+            echo "type=dotnet" >> $GITHUB_OUTPUT
+          else
+            echo "type=unknown" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Setup Java (Maven/Gradle)
+        if: steps.detect.outputs.type == 'maven' || steps.detect.outputs.type == 'gradle'
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '21'
+
+      - name: Generate SBOM (Maven)
+        if: steps.detect.outputs.type == 'maven'
+        run: mvn org.cyclonedx:cyclonedx-maven-plugin:makeBom -q -DskipTests
+
+      - name: Generate SBOM (Gradle)
+        if: steps.detect.outputs.type == 'gradle'
+        run: |
+          if [[ -f "./gradlew" ]]; then
+            chmod +x ./gradlew
+            ./gradlew cyclonedxBom -q || true
+          fi
+
+      - name: Run vulnerability scan
+        id: scan
+        continue-on-error: true
+        run: |
+          PROJECT_TYPE="${{ steps.detect.outputs.type }}"
+
+          case "$PROJECT_TYPE" in
+            maven)   TARGET="sbom:target/bom.json" ;;
+            gradle)  TARGET="sbom:build/reports/bom.json" ;;
+            *)       TARGET="dir:." ;;
+          esac
+
+          # Generate table output
+          grype "$TARGET" --sort-by severity --only-fixed -o table > /tmp/vulns-table.txt 2>/dev/null || true
+
+          # Generate JSON for parsing
+          grype "$TARGET" --sort-by severity --only-fixed -o json > /tmp/vulns.json 2>/dev/null || true
+
+          # Count by severity
+          CRITICAL=$(jq '[.matches[] | select(.vulnerability.severity == "Critical")] | length' /tmp/vulns.json 2>/dev/null || echo "0")
+          HIGH=$(jq '[.matches[] | select(.vulnerability.severity == "High")] | length' /tmp/vulns.json 2>/dev/null || echo "0")
+          MEDIUM=$(jq '[.matches[] | select(.vulnerability.severity == "Medium")] | length' /tmp/vulns.json 2>/dev/null || echo "0")
+          LOW=$(jq '[.matches[] | select(.vulnerability.severity == "Low")] | length' /tmp/vulns.json 2>/dev/null || echo "0")
+          TOTAL=$((CRITICAL + HIGH + MEDIUM + LOW))
+
+          echo "critical=$CRITICAL" >> $GITHUB_OUTPUT
+          echo "high=$HIGH" >> $GITHUB_OUTPUT
+          echo "medium=$MEDIUM" >> $GITHUB_OUTPUT
+          echo "low=$LOW" >> $GITHUB_OUTPUT
+          echo "total=$TOTAL" >> $GITHUB_OUTPUT
+
+          # Fail if critical or high
+          if [[ "$CRITICAL" -gt 0 || "$HIGH" -gt 0 ]]; then
+            echo "status=failed" >> $GITHUB_OUTPUT
+          else
+            echo "status=passed" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Post PR comment
+        if: always()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const status = '${{ steps.scan.outputs.status }}';
+            const critical = '${{ steps.scan.outputs.critical }}';
+            const high = '${{ steps.scan.outputs.high }}';
+            const medium = '${{ steps.scan.outputs.medium }}';
+            const low = '${{ steps.scan.outputs.low }}';
+            const total = '${{ steps.scan.outputs.total }}';
+            const projectType = '${{ steps.detect.outputs.type }}';
+            const fs = require('fs');
+
+            let table = '';
+            try {
+              table = fs.readFileSync('/tmp/vulns-table.txt', 'utf8').trim();
+            } catch (e) {
+              table = 'No scan output available';
+            }
+
+            const emoji = status === 'passed' ? '✅' : '❌';
+            const title = status === 'passed'
+              ? '🛡️ Vulnerability Scan — Passed'
+              : '🛡️ Vulnerability Scan — Failed';
+
+            let body = `## ${title}\n\n`;
+            body += `| Severity | Count |\n|----------|-------|\n`;
+            body += `| 🔴 Critical | ${critical} |\n`;
+            body += `| 🟡 High | ${high} |\n`;
+            body += `| 🔵 Medium | ${medium} |\n`;
+            body += `| 🟢 Low | ${low} |\n`;
+            body += `| **Total** | **${total}** |\n\n`;
+
+            body += `**Project type:** ${projectType}\n\n`;
+
+            if (parseInt(total) > 0) {
+              body += `<details><summary>Full scan results</summary>\n\n\`\`\`\n${table}\n\`\`\`\n</details>\n\n`;
+            }
+
+            if (status === 'failed') {
+              body += `> ⚠️ **Action required:** Fix Critical/High vulnerabilities before merging.\n`;
+              body += `> Run \`vulnscan-summary\` locally for details.\n`;
+            } else if (parseInt(total) === 0) {
+              body += `🎉 No fixable vulnerabilities detected!\n`;
+            } else {
+              body += `ℹ️ Only Medium/Low severity found — not blocking merge.\n`;
+            }
+
+            // Find existing comment to update
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+            });
+
+            const botComment = comments.find(c => c.body.includes('🛡️ Vulnerability Scan'));
+
+            if (botComment) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: botComment.id,
+                body: body,
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                body: body,
+              });
+            }
+
+      - name: Fail if Critical/High vulnerabilities
+        if: steps.scan.outputs.status == 'failed'
+        run: |
+          echo "❌ Found Critical/High vulnerabilities with available fixes."
+          echo "   Critical: ${{ steps.scan.outputs.critical }}"
+          echo "   High: ${{ steps.scan.outputs.high }}"
+          exit 1
